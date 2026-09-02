@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uplift Seoul — Stocktake</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root { color-scheme: light;
+  --bg:#f7f6f3; --card:#ffffff; --ink:#1c1b18; --muted:#75716a; --line:#e6e3dc;
+  --accent:#b3541e; --accent-soft:#fdf0e7; --green:#2e7d4f; --green-soft:#e8f5ee;
+  --red:#b3402e; --red-soft:#fdeeea; --amber:#9a7b0a; --amber-soft:#fdf6dd;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+header { position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--line); padding:10px 16px; }
+.hrow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+h1 { font-size:17px; margin:0; letter-spacing:.2px; }
+h1 small { color:var(--muted); font-weight:400; }
+.spacer { flex:1; }
+select, input[type=date] { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+button { font:inherit; padding:7px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; }
+button:hover { border-color:#c9c4ba; }
+button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+button.primary:hover { filter:brightness(1.07); }
+button.small { padding:4px 9px; font-size:13px; }
+.tabs { display:flex; gap:4px; margin-top:10px; }
+.tab { padding:7px 14px; border-radius:8px 8px 0 0; border:1px solid transparent; background:none; color:var(--muted); font-weight:600; }
+.tab.active { background:var(--bg); border:1px solid var(--line); border-bottom-color:var(--bg); color:var(--ink); }
+main { padding:14px 16px 60px; max-width:1060px; margin:0 auto; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+.catH { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:18px 0 6px; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+td { padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+.num { text-align:right; white-space:nowrap; }
+.chip { display:inline-block; font-size:11px; padding:1px 7px; border-radius:99px; background:var(--bg); border:1px solid var(--line); color:var(--muted); }
+.qty { display:inline-flex; align-items:center; gap:0; }
+.qty button { width:34px; height:34px; padding:0; font-size:18px; line-height:1; border-radius:8px 0 0 8px; }
+.qty button:last-child { border-radius:0 8px 8px 0; }
+.qty input { width:58px; height:34px; text-align:center; border:1px solid var(--line); border-left:none; border-right:none; font:inherit; }
+.qty input:focus { outline:2px solid var(--accent-soft); }
+.qty input.empty { background:var(--amber-soft); }
+.low { color:var(--red); font-weight:700; }
+.ok { color:var(--green); }
+.badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; }
+.badge.order { background:var(--red-soft); color:var(--red); }
+.badge.fine { background:var(--green-soft); color:var(--green); }
+.toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.toolbar input[type=search] { flex:1; min-width:160px; font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
+.muted { color:var(--muted); font-size:13px; }
+.supH { display:flex; align-items:center; gap:10px; margin:0 0 4px; font-size:15px; }
+.total { font-weight:700; }
+.grand { font-size:17px; font-weight:700; text-align:right; padding:10px 4px 0; }
+.sugg { display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--line); }
+.sugg:last-child { border-bottom:none; }
+.sugg .icon { font-size:16px; }
+.toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:50; max-width:90%; }
+.toast.show { opacity:1; }
+dialog { border:1px solid var(--line); border-radius:14px; padding:18px; max-width:480px; width:92%; }
+dialog::backdrop { background:rgba(0,0,0,.35); }
+.frm { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.frm label { font-size:12px; color:var(--muted); display:block; margin-bottom:3px; }
+.frm input, .frm select { width:100%; font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:8px; }
+.frm .full { grid-column:1/-1; }
+.editIn { width:70px; font:inherit; padding:4px 6px; border:1px solid var(--line); border-radius:6px; text-align:right; }
+.editIn.wide { width:110px; text-align:left; }
+.statbar { display:flex; gap:18px; flex-wrap:wrap; margin-bottom:12px; }
+.stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 16px; }
+.stat .v { font-size:20px; font-weight:700; }
+.stat .l { font-size:12px; color:var(--muted); }
+.sync-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--amber); margin-right:5px; vertical-align:middle; }
+.sync-dot.live { background:var(--green); }
+.sync-dot.err { background:var(--red); }
+@media (max-width:640px){ .hideM { display:none; } main{padding:10px 8px 60px;} td,th{padding:6px 5px;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <h1>Uplift Seoul <small>· Stocktake</small></h1>
+    <div class="spacer"></div>
+    <select id="weekSel" title="Stocktake week"></select>
+    <button class="small" id="newWeekBtn">+ New week</button>
+    <button class="small" id="exportBtn">⬇ Export</button>
+    <button class="small" id="importBtn">⬆ Import</button>
+    <input type="file" id="importFile" accept=".json" style="display:none">
+  </div>
+  <div class="muted" id="syncInfo" style="margin-top:4px;"><span class="sync-dot" id="syncDot"></span><span id="syncText">Connecting…</span></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="count">Stocktake</button>
+    <button class="tab" data-tab="order">Order</button>
+    <button class="tab" data-tab="items">Items</button>
+    <button class="tab" data-tab="insights">Suggestions</button>
+  </div>
+</header>
+<main id="mainContent" style="display:none">
+  <section id="tab-count"></section>
+  <section id="tab-order" hidden></section>
+  <section id="tab-items" hidden></section>
+  <section id="tab-insights" hidden></section>
+</main>
+<div id="loadingMsg" style="padding:40px;text-align:center;color:var(--muted);">Loading…</div>
+<div class="toast" id="toast"></div>
+
+<dialog id="itemDlg">
+  <h3 style="margin:0;" id="dlgTitle">Add item</h3>
+  <div class="frm">
+    <div class="full"><label>Name</label><input id="f_name" placeholder="e.g. Campari (700ml)"></div>
+    <div class="full"><label>Korean name (한글)</label><input id="f_ko" placeholder="예: 캄파리 (700ml)"></div>
+    <div><label>Category</label><select id="f_cat"></select></div>
+    <div><label>Supplier</label><input id="f_sup" list="supList"><datalist id="supList"></datalist></div>
+    <div><label>Cost / order unit (₩)</label><input id="f_cost" type="number" min="0" step="1"></div>
+    <div><label>Min stock</label><input id="f_min" type="number" min="0" step="0.5"></div>
+    <div><label>Min order qty (case size)</label><input id="f_moq" type="number" min="1" step="1" value="1"></div>
+    <div><label>Notes</label><input id="f_notes"></div>
+  </div>
+  <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+    <button onclick="itemDlg.close()">Cancel</button>
+    <button class="primary" id="f_save">Save</button>
+  </div>
+</dialog>
+
+<dialog id="newWeekDlg">
+  <h3 style="margin:0 0 8px;">New stocktake week</h3>
+  <div class="muted" style="margin-bottom:10px;">Pick the date for the new week:</div>
+  <input type="date" id="nwDate" style="font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;width:100%;">
+  <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+    <button onclick="newWeekDlg.close()">Cancel</button>
+    <button class="primary" id="nwConfirm">Start week</button>
+  </div>
+</dialog>
+
+<script>
+// ── Firebase ──────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCfIL0o1ESngKhtmpH3D6Cx8FGMAnKtrPg",
+  authDomain: "uplift-stock.firebaseapp.com",
+  projectId: "uplift-stock",
+  storageBucket: "uplift-stock.firebasestorage.app",
+  messagingSenderId: "815604057430",
+  appId: "1:815604057430:web:b5e8395c41b4268a9bc2f7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const docRef = db.collection('stocktake').doc('state');
+
+// ── Seed data ─────────────────────────────────────────────
+const SEED = {"items":[{"name":"Barton Vodka (750ml)","category":"Vodka","supplier":"Seorin","cost":8497.0,"minStock":5.0,"minOrderQty":1.0,"notes":"","history":[3.0,4.0,3.0,null,null,null,null],"nameKo":"바톤 보드카 (750ml)"},{"name":"Absolut (700ml)","category":"Vodka","supplier":"Seorin","cost":30800.0,"minStock":3.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,3.0,2.0,null,null,null],"nameKo":"앱솔루트 (700ml)"},{"name":"Tito's (750ml)","category":"Vodka","supplier":"Seorin","cost":33440.0,"minStock":4.0,"minOrderQty":1.0,"notes":"","history":[3.0,3.0,3.0,3.0,null,null,null],"nameKo":"티토스 (750ml)"},{"name":"Barton Gin (750ml)","category":"Gin","supplier":"Seorin","cost":8497.0,"minStock":5.0,"minOrderQty":1.0,"notes":"","history":[4.0,5.0,4.0,null,null,null,null],"nameKo":"바톤 진 (750ml)"},{"name":"Tanqueray (750ml)","category":"Gin","supplier":"Seorin","cost":36740.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,2.0,null,null,null],"nameKo":"탱커레이 (750ml)"},{"name":"Boatyard Gin (700ml)","category":"Gin","supplier":"Distiler's Select","cost":40000.0,"minStock":4.0,"minOrderQty":1.0,"notes":"","history":[5.0,1.0,3.0,1.0,null,null,null],"nameKo":"보트야드 진 (700ml)"},{"name":"Illusionist Gin (500ml)","category":"Gin","supplier":"Distiler's Select","cost":40000.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,2.0,null,null,null],"nameKo":"일루셔니스트 진 (500ml)"},{"name":"Barton Rum (750ml)","category":"Rum","supplier":"Seorin","cost":10670.0,"minStock":5.0,"minOrderQty":1.0,"notes":"","history":[3.0,6.0,5.0,null,null,null,null],"nameKo":"바톤 럼 (750ml)"},{"name":"Captain Morgan (750ml)","category":"Rum","supplier":"Seorin","cost":24640.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,1.0,2.0,null,null,null],"nameKo":"캡틴 모건 (750ml)"},{"name":"Plantation (1000ml)","category":"Rum","supplier":"Seorin","cost":38940.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,1.0,null,null,null],"nameKo":"플랜테이션 (1000ml)"},{"name":"Havana Club (750ml)","category":"Rum","supplier":"Seorin","cost":25740.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,1.0,null,null,null],"nameKo":"하바나 클럽 (750ml)"},{"name":"Diplomatico (700ml)","category":"Rum","supplier":"Seorin","cost":91300.0,"minStock":0.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,1.0,null,null,null],"nameKo":"디플로마티코 (700ml)"},{"name":"Jose Cuervo Gold (750ml)","category":"Tequila","supplier":"Seorin","cost":38565.0,"minStock":4.0,"minOrderQty":1.0,"notes":"","history":[3.0,1.0,2.0,2.0,null,null,null],"nameKo":"호세 쿠엘보 골드 (750ml)"},{"name":"Jose Cuervo Silver (750ml)","category":"Tequila","supplier":"Seorin","cost":38565.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[3.0,2.0,0.0,1.0,null,null,null],"nameKo":"호세 쿠엘보 실버 (750ml)"},{"name":"1800 Blanco (750ml)","category":"Tequila","supplier":"Seorin","cost":84706.0,"minStock":0.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,1.0,1.0,null,null,null],"nameKo":"1800 블랑코 (750ml)"},{"name":"1800 Anejo (750ml)","category":"Tequila","supplier":"Seorin","cost":84706.0,"minStock":0.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,1.0,null,null,null],"nameKo":"1800 아네호 (750ml)"},{"name":"Campari Milano (750ml)","category":"Liqueur","supplier":"Seorin","cost":40040.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,2.0,null,null,null],"nameKo":"캄파리 밀라노 (750ml)"},{"name":"Cinzano Vermouth Rosso (750ml)","category":"Liqueur","supplier":"Seorin","cost":18377.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[3.0,3.0,3.0,1.0,null,null,null],"nameKo":"친자노 베르무트 로쏘 (750ml)"},{"name":"Cinzano Vermouth Bianco (750ml)","category":"Liqueur","supplier":"Seorin","cost":18377.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,4.0,3.0,1.0,null,null,null],"nameKo":"친자노 베르무트 비앙코 (750ml)"},{"name":"Baileys (700ml)","category":"Liqueur","supplier":"Seorin","cost":36637.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,1.0,1.0,null,null,null],"nameKo":"베일리스 (700ml)"},{"name":"Kahlua Coffee Liqueur (700ml)","category":"Liqueur","supplier":"Seorin","cost":27830.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,3.0,2.0,1.0,null,null,null],"nameKo":"깔루아 커피 리큐르 (700ml)"},{"name":"Jagermeister (700ml)","category":"Liqueur","supplier":"Seorin","cost":40040.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,1.0,1.0,null,null,null],"nameKo":"예거마이스터 (700ml)"},{"name":"Malibu (700ml)","category":"Liqueur","supplier":"Seorin","cost":26510.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,1.0,0.0,null,null,null],"nameKo":"말리부 (700ml)"},{"name":"Peachtree (700ml)","category":"Liqueur","supplier":"Seorin","cost":24750.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,1.0,null,null,null],"nameKo":"피치트리 (700ml)"},{"name":"Kuyper Creme de Cacao (700ml)","category":"Liqueur","supplier":"Seorin","cost":17270.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[2.0,1.0,1.0,1.0,null,null,null],"nameKo":"카이퍼 크렘 드 카카오 (700ml)"},{"name":"Kuyper Triple Sec (700ml)","category":"Liqueur","supplier":"Seorin","cost":17270.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,1.0,null,null,null],"nameKo":"카이퍼 트리플 섹 (700ml)"},{"name":"Kuyper Blue Curacao (700ml)","category":"Liqueur","supplier":"Seorin","cost":17270.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,1.0,1.0,0.0,null,null,null],"nameKo":"카이퍼 블루 큐라소 (700ml)"},{"name":"Berentzen Caramel Cream (700ml)","category":"Liqueur","supplier":"Big Shot","cost":24200.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,null,null,null,null],"nameKo":"베렌젠 카라멜 크림 (700ml)"},{"name":"Berentzen Strawberry Lime (700ml)","category":"Liqueur","supplier":"Big Shot","cost":22000.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[5.0,4.0,2.0,3.0,null,null,null],"nameKo":"베렌젠 스트로베리 라임 (700ml)"},{"name":"Berentzen Sour Apple (700ml)","category":"Liqueur","supplier":"Big Shot","cost":24200.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[5.0,5.0,4.0,4.0,null,null,null],"nameKo":"베렌젠 사워 애플 (700ml)"},{"name":"Aperol (700ml)","category":"Liqueur","supplier":"Seorin","cost":34430.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,1.0,null,null,null],"nameKo":"아페롤 (700ml)"},{"name":"Fireball (700ml)","category":"Liqueur","supplier":"Seorin","cost":51700.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,1.0,1.0,0.0,null,null,null],"nameKo":"파이어볼 (700ml)"},{"name":"Jameson (700ml)","category":"Whiskey","supplier":"Seorin","cost":38553.0,"minStock":4.0,"minOrderQty":1.0,"notes":"","history":[3.0,6.0,2.0,4.0,null,null,null],"nameKo":"제임슨 (700ml)"},{"name":"Jim Beam Bourbon (750ml)","category":"Whiskey","supplier":"Seorin","cost":31167.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,2.0,2.0,null,null,null],"nameKo":"짐빔 버번 (750ml)"},{"name":"Jack Daniels Black (700ml)","category":"Whiskey","supplier":"Seorin","cost":49500.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,0.0,null,null,null],"nameKo":"잭다니엘 블랙 (700ml)"},{"name":"Maker's Mark (700ml)","category":"Whiskey","supplier":"Seorin","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"Price TBC","history":[0.0,0.0,0.0,0.0,null,null,null],"nameKo":"메이커스 마크 (700ml)"},{"name":"Woodford Reserve (700ml)","category":"Whiskey","supplier":"Seorin","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"Price TBC","history":[0.0,null,null,0.0,null,null,null],"nameKo":"우드포드 리저브 (700ml)"},{"name":"Bulleit Bourbon (700ml)","category":"Whiskey","supplier":"Seorin","cost":57627.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,2.0,null,null,null],"nameKo":"불렛 버번 (700ml)"},{"name":"Buffalo Trace Bourbon (700ml)","category":"Whiskey","supplier":"Seorin","cost":55647.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,1.0,null,null,null],"nameKo":"버팔로 트레이스 버번 (700ml)"},{"name":"Dewars 12 (700ml)","category":"Whiskey","supplier":"Seorin","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"Price TBC","history":[0.0,null,null,0.0,null,null,null],"nameKo":"듀어스 12 (700ml)"},{"name":"Balvenie 12 (700ml)","category":"Whiskey","supplier":"Seorin","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"Price TBC","history":[0.0,null,null,0.0,null,null,null],"nameKo":"발베니 12 (700ml)"},{"name":"Macallan 12 (700ml)","category":"Whiskey","supplier":"Seorin","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"Price TBC","history":[1.0,2.0,2.0,2.0,null,null,null],"nameKo":"맥캘란 12 (700ml)"},{"name":"Ardnamurchan (700ml)","category":"Whiskey","supplier":"Distiler's Select","cost":52000.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,2.0,null,null,null],"nameKo":"아드나머칸 (700ml)"},{"name":"Maclean's Nose (700ml)","category":"Whiskey","supplier":"Distiler's Select","cost":52000.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,2.0,null,null,null],"nameKo":"맥클린스 노즈 (700ml)"},{"name":"Hennessy V.S.O.P (700ml)","category":"Brandy","supplier":"Seorin","cost":99000.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,1.0,null,null,null],"nameKo":"헤네시 V.S.O.P (700ml)"},{"name":"Lemon Superjuice (333ml)","category":"Juice & Syrup","supplier":"","cost":1685.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,1.0,1.0,null,null,null,null],"nameKo":"레몬 슈퍼주스 (333ml)"},{"name":"Lime Superjuice (333ml)","category":"Juice & Syrup","supplier":"","cost":5198.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,3.0,0.0,null,null,null,null],"nameKo":"라임 슈퍼주스 (333ml)"},{"name":"Orange Juice (1000ml)","category":"Juice & Syrup","supplier":"Coupang","cost":0,"minStock":3.0,"minOrderQty":1.0,"notes":"","history":[3.0,3.0,0.0,null,null,null,null],"nameKo":"오렌지 주스 (1000ml)"},{"name":"Pineapple Juice (1000ml)","category":"Juice & Syrup","supplier":"Coupang","cost":0,"minStock":3.0,"minOrderQty":1.0,"notes":"","history":[3.0,3.0,2.0,null,null,null,null],"nameKo":"파인애플 주스 (1000ml)"},{"name":"Cranberry Juice (1890ml)","category":"Juice & Syrup","supplier":"Coupang","cost":0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,null,null,null,null],"nameKo":"크랜베리 주스 (1890ml)"},{"name":"Grapefruit Juice (1890ml)","category":"Juice & Syrup","supplier":"Coupang","cost":0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,null,null,null,null],"nameKo":"자몽 주스 (1890ml)"},{"name":"Simple Syrup (400ml)","category":"Juice & Syrup","supplier":"","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"House made","history":[null,1.0,1.0,null,null,null,null],"nameKo":"심플 시럽 (400ml)"},{"name":"Demerara Syrup (163ml)","category":"Juice & Syrup","supplier":"","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"House made","history":[null,null,null,null,null,null,null],"nameKo":"데메라라 시럽 (163ml)"},{"name":"Grenadine (750ml)","category":"Juice & Syrup","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[null,2.0,2.0,null,null,null,null],"nameKo":"그레나딘 (750ml)"},{"name":"Agave Syrup (1020ml)","category":"Juice & Syrup","supplier":"Coupang","cost":20590.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[null,3.0,3.0,null,null,null,null],"nameKo":"아가베 시럽 (1020ml)"},{"name":"Tabasco (150ml)","category":"Juice & Syrup","supplier":"Coupang","cost":8820.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[null,1.0,1.0,null,null,null,null],"nameKo":"타바스코 (150ml)"},{"name":"Angostura Aromatic (200ml)","category":"Bitters","supplier":"","cost":67210.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,2.0,2.0,null,null,null,null],"nameKo":"앙고스투라 아로마틱 비터스 (200ml)"},{"name":"Peychaud's (148ml)","category":"Bitters","supplier":"","cost":33550.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,null,null,null,null,null],"nameKo":"페이쇼즈 비터스 (148ml)"},{"name":"Angostura Orange (100ml)","category":"Bitters","supplier":"","cost":43340.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,0.0,null,null,null,null,null],"nameKo":"앙고스투라 오렌지 비터스 (100ml)"},{"name":"Angostura Cacao (100ml)","category":"Bitters","supplier":"","cost":43340.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,0.0,null,null,null,null,null],"nameKo":"앙고스투라 카카오 비터스 (100ml)"},{"name":"Vinedos Horizonte White (750ml)","category":"Wine","supplier":"Seorin","cost":6600.0,"minStock":6.0,"minOrderQty":6.0,"notes":"Case of 6","history":[4.0,5.0,2.0,7.0,null,null,null],"nameKo":"비네도스 오리존테 화이트 (750ml)"},{"name":"Couronne Bordeaux Red (750ml)","category":"Wine","supplier":"Seorin","cost":10230.0,"minStock":6.0,"minOrderQty":6.0,"notes":"Case of 6","history":[7.0,3.0,6.0,5.0,null,null,null],"nameKo":"쿠론 보르도 레드 (750ml)"},{"name":"Hans Baer Riesling (750ml)","category":"Wine","supplier":"Big Shot","cost":13200.0,"minStock":3.0,"minOrderQty":6.0,"notes":"Case of 6","history":[6.0,4.0,1.0,0.0,null,null,null],"nameKo":"한스 베어 리슬링 (750ml)"},{"name":"Veuve Clicquot Brut (750ml)","category":"Wine","supplier":"Seorin","cost":90977.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,1.0,1.0,1.0,null,null,null],"nameKo":"뵈브 클리코 브뤼 (750ml)"},{"name":"Moet & Chandon Imperial (750ml)","category":"Wine","supplier":"Seorin","cost":61700.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,0.0,1.0,2.0,null,null,null],"nameKo":"모엣 샹동 임페리얼 (750ml)"},{"name":"Prospero Gran Selezione (750ml)","category":"Wine","supplier":"Seorin","cost":9980.0,"minStock":6.0,"minOrderQty":6.0,"notes":"Case of 6","history":[8.0,4.0,2.0,7.0,null,null,null],"nameKo":"프로스페로 그란 셀레지오네 (750ml)"},{"name":"Platinum Pale Ale (20L)","category":"Draft Beer","supplier":"Seorin","cost":108680.0,"minStock":3.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,3.0,null,null,null,null],"nameKo":"플래티넘 페일에일 (20L)"},{"name":"Hitachino White Ale (20L)","category":"Draft Beer","supplier":"Seorin","cost":140250.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,null,3.0,null,null,null,null],"nameKo":"히타치노 화이트에일 (20L)"},{"name":"Beer Gas","category":"Draft Beer","supplier":"Seorin","cost":90000.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,1.0,7.0,null,null,null],"nameKo":"맥주 가스"},{"name":"Tsingtao Non-Alc. (330ml x24)","category":"Bottled Beer","supplier":"Seorin","cost":29260.0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[0.0,44.0,51.0,36.0,null,null,null],"nameKo":"칭따오 논알콜 (330ml x24)"},{"name":"Corona (330ml x24)","category":"Bottled Beer","supplier":"Seorin","cost":72894.0,"minStock":48.0,"minOrderQty":24.0,"notes":"Case of 24","history":[2.0,47.0,25.0,36.0,null,null,null],"nameKo":"코로나 (330ml x24)"},{"name":"Tiger (640ml x12)","category":"Bottled Beer","supplier":"Seorin","cost":36300.0,"minStock":12.0,"minOrderQty":12.0,"notes":"Case of 12","history":[0.0,20.0,33.0,26.0,null,null,null],"nameKo":"타이거 (640ml x12)"},{"name":"Guinness (330ml x24)","category":"Bottled Beer","supplier":"Seorin","cost":102520.0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[1.0,37.0,34.0,34.0,null,null,null],"nameKo":"기네스 (330ml x24)"},{"name":"Schneider Helles (500ml x20)","category":"Bottled Beer","supplier":"Seorin","cost":85470.0,"minStock":0.0,"minOrderQty":20.0,"notes":"Case of 20","history":[1.0,28.0,26.0,null,null,null,null],"nameKo":"슈나이더 헬레스 (500ml x20)"},{"name":"Coke (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[0.0,22.0,22.0,null,null,null,null],"nameKo":"코카콜라 (x24)"},{"name":"Coke Zero (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[1.0,51.0,37.0,null,null,null,null],"nameKo":"코카콜라 제로 (x24)"},{"name":"Canada Dry Tonic (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[0.0,30.0,17.0,null,null,null,null],"nameKo":"캐나다드라이 토닉워터 (x24)"},{"name":"Canada Dry Ginger Ale (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[0.0,10.0,2.0,null,null,null,null],"nameKo":"캐나다드라이 진저에일 (x24)"},{"name":"Bundaberg Ginger Beer (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[0.0,63.0,39.0,null,null,null,null],"nameKo":"분다버그 진저비어 (x24)"},{"name":"Red Bull (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[1.0,45.0,63.0,null,null,null,null],"nameKo":"레드불 (x24)"},{"name":"Red Bull Sugar Free (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[0.0,23.0,15.0,null,null,null,null],"nameKo":"레드불 슈가프리 (x24)"},{"name":"Sprite (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":24.0,"minOrderQty":24.0,"notes":"Case of 24","history":[1.0,23.0,14.0,null,null,null,null],"nameKo":"스프라이트 (x24)"},{"name":"Water (x24)","category":"Sodas","supplier":"Coupang","cost":0,"minStock":96.0,"minOrderQty":24.0,"notes":"Case of 24","history":[2.0,43.0,0.0,null,null,null,null],"nameKo":"생수 (x24)"},{"name":"Singha Soda Water (x48)","category":"Sodas","supplier":"Coupang","cost":37630.0,"minStock":48.0,"minOrderQty":48.0,"notes":"Case of 48","history":[1.0,76.0,41.0,null,null,null,null],"nameKo":"싱하 탄산수 (x48)"},{"name":"Kanu Coffee (x120)","category":"Sodas","supplier":"Coupang","cost":36420.0,"minStock":120.0,"minOrderQty":120.0,"notes":"Case of 120","history":[0.0,95.0,151.0,null,null,null,null],"nameKo":"카누 커피 (x120)"},{"name":"Basil (40g)","category":"Herbs","supplier":"Coupang","cost":4480.0,"minStock":4.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,null,null,null,null],"nameKo":"바질 (40g)"},{"name":"Rosemary (20g)","category":"Herbs","supplier":"Coupang","cost":3160.0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,1.0,2.0,null,null,null,null],"nameKo":"로즈마리 (20g)"},{"name":"Mint (100g)","category":"Herbs","supplier":"Coupang","cost":6980.0,"minStock":10.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,2.0,null,null,null,null],"nameKo":"민트 (100g)"},{"name":"Lemon (x22)","category":"Fruit","supplier":"Coupang","cost":9270.0,"minStock":22.0,"minOrderQty":22.0,"notes":"Bag of 22","history":[14.0,17.0,5.0,null,null,null,null],"nameKo":"레몬 (x22)"},{"name":"Lime (x7)","category":"Fruit","supplier":"Coupang","cost":0,"minStock":9.0,"minOrderQty":7.0,"notes":"Bag of 7","history":[9.0,9.0,2.0,null,null,null,null],"nameKo":"라임 (x7)"},{"name":"Orange (x6)","category":"Fruit","supplier":"Coupang","cost":7860.0,"minStock":6.0,"minOrderQty":6.0,"notes":"Bag of 6","history":[6.0,4.0,3.0,null,null,null,null],"nameKo":"오렌지 (x6)"},{"name":"Caperberries","category":"Canned/Stable","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,1.0,1.0,null,null,null,null],"nameKo":"케이퍼베리"},{"name":"Jalapenos","category":"Canned/Stable","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,1.0,2.0,null,null,null,null],"nameKo":"할라피뇨"},{"name":"Olives","category":"Canned/Stable","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,null,null,null,null],"nameKo":"올리브"},{"name":"Tomato (Can)","category":"Canned/Stable","supplier":"Coupang","cost":0,"minStock":2.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,null,null,null,null],"nameKo":"토마토 (캔)"},{"name":"Cherries","category":"Canned/Stable","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[2.0,3.0,3.0,null,null,null,null],"nameKo":"체리"},{"name":"Mayo","category":"Canned/Stable","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[2.0,2.0,2.0,null,null,null,null],"nameKo":"마요네즈"},{"name":"Salsa","category":"Canned/Stable","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[2.0,3.0,2.0,null,null,null,null],"nameKo":"살사 소스"},{"name":"Kettle Chips","category":"Canned/Stable","supplier":"Costco","cost":0,"minStock":3.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,0.0,null,null,null,null],"nameKo":"케틀칩"},{"name":"Nacho Chips","category":"Canned/Stable","supplier":"Costco","cost":0,"minStock":3.0,"minOrderQty":1.0,"notes":"","history":[2.0,4.0,2.0,null,null,null,null],"nameKo":"나초칩"},{"name":"Popcorn (x44)","category":"Canned/Stable","supplier":"Costco","cost":0,"minStock":1.0,"minOrderQty":44.0,"notes":"Case of 44","history":[0.0,13.0,13.0,null,null,null,null],"nameKo":"팝콘 (x44)"},{"name":"White Sugar","category":"Dry Ingredients","supplier":"Coupang","cost":4040.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,1.0,1.0,null,null,null,null],"nameKo":"백설탕"},{"name":"Demerara Sugar","category":"Dry Ingredients","supplier":"Coupang","cost":25300.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,null,null,null,null],"nameKo":"데메라라 설탕"},{"name":"Salt","category":"Dry Ingredients","supplier":"Coupang","cost":1900.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,null,null,null,null],"nameKo":"소금"},{"name":"Citric Acid","category":"Dry Ingredients","supplier":"Coupang","cost":5390.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,null,null,null,null],"nameKo":"구연산"},{"name":"Malic Acid","category":"Dry Ingredients","supplier":"Coupang","cost":7900.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,null,null,null,null],"nameKo":"사과산"},{"name":"Methylcellulose","category":"Dry Ingredients","supplier":"Coupang","cost":3000.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[null,null,null,null,null,null,null],"nameKo":"메틸셀룰로오스"},{"name":"Gum Arabic","category":"Dry Ingredients","supplier":"Coupang","cost":8860.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[null,null,null,null,null,null,null],"nameKo":"아라비아검"},{"name":"Xanthan Gum","category":"Dry Ingredients","supplier":"Coupang","cost":8860.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[null,null,null,null,null,null,null],"nameKo":"잔탄검"},{"name":"Pickles (1.5L)","category":"Prepped Food","supplier":"Kimmy","cost":15000.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,1.0,1.0,null,null,null,null],"nameKo":"피클 (1.5L)"},{"name":"Bread","category":"Frozen Food","supplier":"Coupang","cost":0,"minStock":20.0,"minOrderQty":1.0,"notes":"","history":[10.0,8.0,2.0,null,null,null,null],"nameKo":"빵"},{"name":"Pork (Unprepped)","category":"Frozen Food","supplier":"Coupang","cost":11890.0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[0.0,0.0,0.0,null,null,null,null],"nameKo":"돼지고기 (손질 전)"},{"name":"Toilet Paper","category":"Supplies","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,null,null,null,null,null],"nameKo":"화장지"},{"name":"Paper Tissues","category":"Supplies","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,null,null,null,null,null],"nameKo":"티슈"},{"name":"Dishwashing Liquid","category":"Supplies","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,null,null,null,null,null],"nameKo":"주방세제"},{"name":"Recycling Bags","category":"Supplies","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,null,null,null,null,null],"nameKo":"재활용 봉투"},{"name":"Plastic Straws","category":"Supplies","supplier":"Coupang","cost":0,"minStock":1.0,"minOrderQty":1.0,"notes":"","history":[1.0,null,null,null,null,null,null],"nameKo":"플라스틱 빨대"}]};
+
+// ── State ─────────────────────────────────────────────────
+let state = null;
+let _saveTimer = null;
+let _ignoreNextSnapshot = false;
+
+function seedState(){
+  const weekKeys = ['2026-05-17','2026-05-24','2026-05-31','2026-06-07'];
+  const counts = {}; weekKeys.forEach(k=>counts[k]={});
+  const items = SEED.items.map((it,i)=>{
+    const id = 'i'+(i+1);
+    (it.history||[]).slice(0,4).forEach((v,wi)=>{ if(v!==null && v!==undefined) counts[weekKeys[wi]][id]=v; });
+    return { id, name:it.name, nameKo:it.nameKo||'', category:it.category, supplier:it.supplier||'',
+             cost:it.cost||0, minStock:it.minStock||0, minOrderQty:it.minOrderQty||1,
+             notes:it.notes||'', archived:false };
+  });
+  return { items, counts, currentWeek: weekKeys[weekKeys.length-1], nextId: items.length+1 };
+}
+
+function save(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(()=>{
+    _ignoreNextSnapshot = true;
+    docRef.set(state)
+      .then(()=>setSyncStatus('live','Synced'))
+      .catch(e=>{ setSyncStatus('err','Save failed'); console.error(e); });
+  }, 400);
+}
+
+// ── Sync status ───────────────────────────────────────────
+function setSyncStatus(type, msg){
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot' + (type==='live'?' live':type==='err'?' err':'');
+  txt.textContent = msg;
+}
+
+// ── Firestore listener ────────────────────────────────────
+function initData(){
+  setSyncStatus('','Connecting…');
+  docRef.onSnapshot(doc=>{
+    if(_ignoreNextSnapshot){ _ignoreNextSnapshot=false; return; }
+    if(doc.exists){
+      state = doc.data();
+      setSyncStatus('live','Live');
+    } else {
+      state = seedState();
+      docRef.set(state);
+      setSyncStatus('live','Initialised');
+    }
+    document.getElementById('loadingMsg').style.display='none';
+    document.getElementById('mainContent').style.display='';
+    renderAll();
+  }, err=>{
+    setSyncStatus('err','Connection error');
+    console.error('Firestore error:', err);
+    if(!state){ state=seedState(); }
+    document.getElementById('loadingMsg').textContent='Offline — changes won\'t be saved.';
+    document.getElementById('mainContent').style.display='';
+    renderAll();
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────
+const W = '₩';
+const fmtW = n => W + Math.round(n).toLocaleString('en-US');
+const unitCost = it => it.cost / Math.max(1, it.minOrderQty||1);
+const weeks = () => Object.keys(state.counts).sort();
+const activeItems = () => state.items.filter(i=>!i.archived);
+function countOf(id,wk){ const v=state.counts[wk]?state.counts[wk][id]:undefined; return(v===undefined||v===null)?null:v; }
+function latestCount(id,uptoWk){
+  const ws=weeks().filter(w=>w<=uptoWk).reverse();
+  for(const w of ws){ const v=countOf(id,w); if(v!==null) return{v,w}; }
+  return null;
+}
+function avgUse(id){
+  const ws=weeks(); const drops=[]; let prev=null;
+  for(const w of ws){ const v=countOf(id,w); if(v===null) continue;
+    if(prev!==null && prev>=v) drops.push(prev-v); prev=v; }
+  if(!drops.length) return null;
+  return drops.reduce((a,b)=>a+b,0)/drops.length;
+}
+function suggestion(it){
+  const lc=latestCount(it.id,state.currentWeek); const cur=lc?lc.v:0;
+  const use=avgUse(it.id);
+  const target=Math.max(it.minStock,use===null?0:Math.ceil(use));
+  let need=target-cur;
+  if(need<=0) return{qty:0,cur,use,target,stale:lc?lc.w!==state.currentWeek:true};
+  const moq=Math.max(1,it.minOrderQty||1);
+  need=Math.ceil(need/moq)*moq;
+  return{qty:need,cur,use,target,stale:lc?lc.w!==state.currentWeek:true};
+}
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ── Export / Import ───────────────────────────────────────
+document.getElementById('exportBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url;
+  a.download='uplift-stocktake-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Exported ✓');
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const obj=JSON.parse(ev.target.result);
+      if(!obj.items||!obj.counts) throw new Error('Not a valid backup');
+      if(!confirm('Replace ALL current data with this backup?')){ e.target.value=''; return; }
+      state=obj; save(); renderAll(); toast('Imported ✓');
+    }catch(err){ toast('Import failed: '+err.message); }
+    e.target.value='';
+  };
+  reader.readAsText(file);
+};
+
+// ── Week selector ─────────────────────────────────────────
+function renderWeekSel(){
+  const sel=document.getElementById('weekSel');
+  sel.innerHTML=weeks().map(w=>`<option value="${w}" ${w===state.currentWeek?'selected':''}>Week of ${w}</option>`).join('');
+}
+document.getElementById('weekSel').onchange=e=>{ state.currentWeek=e.target.value; save(); renderAll(); };
+document.getElementById('newWeekBtn').onclick=()=>{
+  document.getElementById('nwDate').value=new Date().toISOString().slice(0,10);
+  newWeekDlg.showModal();
+};
+document.getElementById('nwConfirm').onclick=()=>{
+  const d=document.getElementById('nwDate').value;
+  if(!d) return toast('Pick a date');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return toast('Use YYYY-MM-DD format');
+  if(!state.counts[d]) state.counts[d]={};
+  state.currentWeek=d; save(); renderAll(); toast('Started week of '+d);
+  newWeekDlg.close();
+};
+
+// ── Tabs ──────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
+  ['count','order','items','insights'].forEach(t=>document.getElementById('tab-'+t).hidden=(t!==b.dataset.tab));
+  renderAll();
+});
+
+// ── Stocktake tab ─────────────────────────────────────────
+let countFilter='';
+function renderCount(){
+  const el=document.getElementById('tab-count'); const wk=state.currentWeek;
+  const its=activeItems().filter(i=>!countFilter||(i.name+' '+i.category+' '+i.supplier).toLowerCase().includes(countFilter));
+  const counted=activeItems().filter(i=>countOf(i.id,wk)!==null).length;
+  const cats=[...new Set(its.map(i=>i.category))];
+  let html=`<div class="toolbar"><input type="search" id="cSearch" placeholder="Search items…" value="${esc(countFilter)}"><span class="muted">${counted}/${activeItems().length} counted</span></div>`;
+  for(const c of cats){
+    html+=`<div class="catH">${esc(c)}</div><div class="card"><table>`;
+    for(const it of its.filter(i=>i.category===c)){
+      const v=countOf(it.id,wk);
+      const last=latestCount(it.id,weeks().filter(w=>w<wk).pop()||'');
+      const lowNow=v!==null&&v<it.minStock;
+      html+=`<tr>
+        <td><div>${esc(it.name)}</div><div class="muted hideM" style="font-size:12px">${esc(it.supplier||'—')} · min ${it.minStock}</div></td>
+        <td class="num hideM muted">last: ${last?last.v:'—'}</td>
+        <td class="num">${lowNow?'<span class="badge order">LOW</span>':(v!==null?'<span class="badge fine">OK</span>':'')}</td>
+        <td class="num"><span class="qty">
+          <button onclick="bump('${it.id}',-0.5)">−</button>
+          <input type="number" inputmode="decimal" min="0" step="0.5" class="${v===null?'empty':''}" value="${v===null?'':v}" onchange="setCount('${it.id}',this.value)">
+          <button onclick="bump('${it.id}',0.5)">+</button>
+        </span></td></tr>`;
+    }
+    html+=`</table></div>`;
+  }
+  el.innerHTML=html;
+  const s=document.getElementById('cSearch');
+  s.oninput=e=>{ countFilter=e.target.value.toLowerCase(); const pos=s.selectionStart; renderCount(); const ns=document.getElementById('cSearch'); ns.focus(); ns.setSelectionRange(pos,pos); };
+}
+function setCount(id,val){
+  const wk=state.currentWeek;
+  if(val===''||val===null){ delete state.counts[wk][id]; }
+  else{ const n=Math.max(0,parseFloat(val)); if(isNaN(n)) return; state.counts[wk][id]=n; }
+  save(); setSyncStatus('','Saving…');
+}
+function bump(id,d){
+  const wk=state.currentWeek; const cur=countOf(id,wk);
+  state.counts[wk][id]=Math.max(0,(cur===null?0:cur)+d);
+  save(); setSyncStatus('','Saving…'); renderCount();
+}
+
+// ── Order tab ─────────────────────────────────────────────
+let showAllOrder=false; let orderOverride={};
+function renderOrder(){
+  const el=document.getElementById('tab-order');
+  const rows=activeItems().map(it=>({it,s:suggestion(it)}));
+  const visible=rows.filter(r=>showAllOrder||r.s.qty>0||(orderOverride[r.it.id]||0)>0);
+  const sups=[...new Set(visible.map(r=>r.it.supplier||'(no supplier)'))].sort();
+  const qtyOf=r=>orderOverride[r.it.id]!==undefined?orderOverride[r.it.id]:r.s.qty;
+  let grand=0;
+  let html=`<div class="toolbar"><span class="muted">Order for week of <b>${state.currentWeek}</b>. Suggested = top up to max(min stock, avg weekly use), rounded to case size.</span><div class="spacer"></div><label class="muted"><input type="checkbox" ${showAllOrder?'checked':''} onchange="showAllOrder=this.checked;renderOrder()"> show all</label></div>`;
+  if(!visible.length) html+=`<div class="card">Nothing to order — all stocked to target. 🎉</div>`;
+  for(const sup of sups){
+    const rs=visible.filter(r=>(r.it.supplier||'(no supplier)')===sup);
+    let sub=0; let body='';
+    for(const r of rs){
+      const q=qtyOf(r); const moq=Math.max(1,r.it.minOrderQty||1); const line=(q/moq)*r.it.cost; sub+=line;
+      const cases=q/moq;
+      body+=`<tr>
+        <td>${esc(r.it.name)}${r.s.stale?' <span class="chip">stale</span>':''}</td>
+        <td class="num">${r.s.cur}</td><td class="num hideM">${r.it.minStock}</td>
+        <td class="num hideM">${r.s.use===null?'—':r.s.use.toFixed(1)}</td>
+        <td class="num"><input class="editIn" type="number" min="0" step="${moq}" value="${q}" onchange="orderOverride['${r.it.id}']=Math.max(0,parseFloat(this.value)||0);renderOrder()">${moq>1?`<div class="muted" style="font-size:11px">${cases%1?cases.toFixed(1):cases} case${cases>1?'s':''} of ${moq}</div>`:''}</td>
+        <td class="num hideM">${r.it.cost?fmtW(r.it.cost)+(moq>1?'<span class="muted">/case</span>':''):'—'}</td>
+        <td class="num total">${line?fmtW(line):'—'}</td></tr>`;
+    }
+    grand+=sub;
+    html+=`<div class="card"><div class="supH"><b>${esc(sup)}</b><span class="chip">${rs.length} item${rs.length>1?'s':''}</span><div class="spacer"></div><span class="total">${fmtW(sub)}</span>
+      <button class="small" onclick="copyOrder('${esc(sup)}','en')">Copy EN</button>
+      <button class="small" onclick="copyOrder('${esc(sup)}','ko')">Copy 한글</button></div>
+      <table><tr><th>Item</th><th class="num">Stock</th><th class="num hideM">Min</th><th class="num hideM">Avg/wk</th><th class="num">Order</th><th class="num hideM">Price ₩</th><th class="num">Total</th></tr>${body}</table></div>`;
+  }
+  if(visible.length) html+=`<div class="grand">Grand total: ${fmtW(grand)}</div>`;
+  el.innerHTML=html;
+}
+function copyOrder(sup,lang){
+  const ko=lang==='ko';
+  const rows=activeItems().map(it=>({it,s:suggestion(it)}))
+    .filter(r=>(r.it.supplier||'(no supplier)')===sup)
+    .map(r=>({r,q:orderOverride[r.it.id]!==undefined?orderOverride[r.it.id]:r.s.qty}))
+    .filter(x=>x.q>0);
+  const header=ko?`업리프트 서울 발주서 — ${sup} — ${state.currentWeek}`:`Uplift Seoul order — ${sup} — week of ${state.currentWeek}`;
+  const txt=header+'\n'+rows.map(x=>{
+    const moq=Math.max(1,x.r.it.minOrderQty||1); const cases=x.q/moq; const cs=cases%1?cases.toFixed(1):cases;
+    const nm=ko?(x.r.it.nameKo||x.r.it.name):x.r.it.name;
+    const ct=moq>1?(ko?` (${cs}박스)`:` (${cs} case${cases>1?'s':''})`):'';
+    return `• ${nm} × ${x.q}`+ct;
+  }).join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(()=>toast(ko?sup+' 주문 복사 완료':'Order copied for '+sup));
+  } else {
+    const ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    toast(ko?sup+' 주문 복사 완료':'Order copied for '+sup);
+  }
+}
+
+// ── Items tab ─────────────────────────────────────────────
+let itemFilter=''; let editingId=null;
+function renderItems(){
+  const el=document.getElementById('tab-items');
+  const its=activeItems().filter(i=>!itemFilter||(i.name+' '+i.category+' '+i.supplier).toLowerCase().includes(itemFilter));
+  let html=`<div class="toolbar"><input type="search" id="iSearch" placeholder="Search items…" value="${esc(itemFilter)}"><button class="primary" onclick="openItemDlg(null)">+ Add item</button></div>
+  <div class="card"><table><tr><th>Item</th><th class="hideM">Category</th><th class="hideM">Supplier</th><th class="num">Price ₩</th><th class="num">Min</th><th class="num hideM">Case</th><th></th></tr>`;
+  for(const it of its){
+    html+=`<tr>
+      <td>${esc(it.name)}${it.nameKo?`<div class="muted" style="font-size:12px">${esc(it.nameKo)}</div>`:''}${it.notes?`<div class="muted" style="font-size:12px">${esc(it.notes)}</div>`:''}</td>
+      <td class="hideM"><span class="chip">${esc(it.category)}</span></td>
+      <td class="hideM muted">${esc(it.supplier||'—')}</td>
+      <td class="num"><input class="editIn" type="number" min="0" value="${it.cost}" onchange="updField('${it.id}','cost',this.value)"></td>
+      <td class="num"><input class="editIn" type="number" min="0" step="0.5" value="${it.minStock}" onchange="updField('${it.id}','minStock',this.value)"></td>
+      <td class="num hideM"><input class="editIn" type="number" min="1" value="${it.minOrderQty}" onchange="updField('${it.id}','minOrderQty',this.value)"></td>
+      <td class="num"><button class="small" onclick="openItemDlg('${it.id}')">Edit</button> <button class="small" onclick="archiveItem('${it.id}')">✕</button></td></tr>`;
+  }
+  html+=`</table></div>`;
+  el.innerHTML=html;
+  const s=document.getElementById('iSearch');
+  s.oninput=e=>{ itemFilter=e.target.value.toLowerCase(); const p=s.selectionStart; renderItems(); const ns=document.getElementById('iSearch'); ns.focus(); ns.setSelectionRange(p,p); };
+}
+function updField(id,f,v){ const it=state.items.find(i=>i.id===id); it[f]=Math.max(0,parseFloat(v)||0); save(); toast('Saved'); }
+function archiveItem(id){ const it=state.items.find(i=>i.id===id); if(confirm('Remove "'+it.name+'" from the lists? History kept.')){ it.archived=true; save(); renderAll(); } }
+function openItemDlg(id){
+  editingId=id;
+  const cats=[...new Set(state.items.map(i=>i.category))];
+  document.getElementById('f_cat').innerHTML=cats.map(c=>`<option>${esc(c)}</option>`).join('')+'<option value="__new__">+ New category…</option>';
+  document.getElementById('supList').innerHTML=[...new Set(state.items.map(i=>i.supplier).filter(Boolean))].map(s=>`<option value="${esc(s)}">`).join('');
+  const it=id?state.items.find(i=>i.id===id):null;
+  document.getElementById('dlgTitle').textContent=it?'Edit item':'Add item';
+  f_name.value=it?it.name:''; f_ko.value=it?(it.nameKo||''):''; f_sup.value=it?it.supplier:''; f_cost.value=it?it.cost:'';
+  f_min.value=it?it.minStock:1; f_moq.value=it?it.minOrderQty:1; f_notes.value=it?it.notes:'';
+  if(it) f_cat.value=it.category;
+  itemDlg.showModal();
+}
+document.getElementById('f_save').onclick=()=>{
+  let cat=f_cat.value;
+  if(cat==='__new__'){ cat=prompt('New category name:'); if(!cat) return; }
+  if(!f_name.value.trim()) return toast('Name required');
+  const data={name:f_name.value.trim(),nameKo:f_ko.value.trim(),category:cat,supplier:f_sup.value.trim(),
+    cost:parseFloat(f_cost.value)||0,minStock:parseFloat(f_min.value)||0,
+    minOrderQty:Math.max(1,parseFloat(f_moq.value)||1),notes:f_notes.value.trim()};
+  if(editingId){ Object.assign(state.items.find(i=>i.id===editingId),data); }
+  else{ state.items.push({id:'i'+(state.nextId++),archived:false,...data}); }
+  save(); itemDlg.close(); renderAll(); toast(editingId?'Item updated':'Item added');
+};
+
+// ── Insights tab ──────────────────────────────────────────
+function renderInsights(){
+  const el=document.getElementById('tab-insights'); const wkCount=weeks().length; const suggs=[];
+  for(const it of activeItems()){
+    const use=avgUse(it.id); if(use===null) continue; const u=Math.ceil(use);
+    if(use>0&&u>it.minStock) suggs.push({it,icon:'📈',txt:`Avg use is <b>${use.toFixed(1)}/wk</b> but min stock is only <b>${it.minStock}</b> — you risk running out.`,newMin:u});
+    else if(use===0&&it.minStock>2&&wkCount>=3) suggs.push({it,icon:'📉',txt:`No recorded use across ${wkCount} weeks, but min stock is <b>${it.minStock}</b>.`,newMin:Math.max(1,Math.floor(it.minStock/2))});
+  }
+  const totalValue=activeItems().reduce((a,it)=>{ const lc=latestCount(it.id,state.currentWeek); return a+(lc?lc.v:0)*unitCost(it); },0);
+  const weeklySpend=activeItems().reduce((a,it)=>{ const u=avgUse(it.id); return a+(u||0)*unitCost(it); },0);
+  let html=`<div class="statbar">
+    <div class="stat"><div class="v">${fmtW(totalValue)}</div><div class="l">stock on hand</div></div>
+    <div class="stat"><div class="v">${fmtW(weeklySpend)}</div><div class="l">est. usage cost / week</div></div>
+    <div class="stat"><div class="v">${suggs.length}</div><div class="l">suggested min changes</div></div>
+  </div><div class="card">`;
+  if(!suggs.length) html+=`<div class="muted">No suggestions yet — they appear once a few weeks of counts are in.</div>`;
+  for(const s of suggs){
+    html+=`<div class="sugg"><span class="icon">${s.icon}</span>
+      <div style="flex:1"><b>${esc(s.it.name)}</b><div class="muted">${s.txt}</div></div>
+      <button class="small" onclick="applyMin('${s.it.id}',${s.newMin})">Set min to ${s.newMin}</button></div>`;
+  }
+  html+=`</div><div class="muted" style="margin-top:10px;">Usage is estimated from week-to-week drops in counts. The more weeks counted, the better these get.</div>`;
+  el.innerHTML=html;
+}
+function applyMin(id,v){ state.items.find(i=>i.id===id).minStock=v; save(); renderInsights(); toast('Min stock updated'); }
+
+// ── Render all ────────────────────────────────────────────
+function renderAll(){ renderWeekSel(); renderCount(); renderOrder(); renderItems(); renderInsights(); }
+
+// ── Boot ──────────────────────────────────────────────────
+initData();
+</script>
+</body>
+</html>
